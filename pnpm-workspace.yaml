@@ -1,0 +1,32 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependency install scripts are denied unless listed here with a reason (pnpm strict builds).
+allowBuilds:
+  # Its postinstall only re-checks/downloads the native binding; the binding for each platform is
+  # installed as an optional dependency, so the script is not needed.
+  unrs-resolver: false
+
+# Supply-chain protections (semgrep pnpm rules, Phase 1):
+minimumReleaseAge: 10080        # install only versions published at least 7 days ago
+blockExoticSubdeps: true        # transitive deps only from the registry (no git/tarball URLs)
+trustPolicy: no-downgrade       # refuse versions whose publish provenance got weaker
+trustPolicyExclude:
+  # Investigated 2026-10-12: no 3.x release of this package ever had provenance; 3.10.1 is a 3.x
+  # maintenance release published (2025-04-21) after 4.2.6 introduced provenance on the 4.x line,
+  # which pnpm's date-based check reads as a downgrade. Required by eslint-config-next (^3.5.2).
+  # Exact version only — any other trust downgrade still fails the install.
+  - 'eslint-import-resolver-typescript@3.10.1'
+  # semver: no 6.x release ever had provenance; 6.3.1 (2023-07-10) is a 6.x maintenance release after provenance began on another major (7.5.1).
+  - 'semver@6.3.1'
+
+# Audit exceptions: each needs a documented risk acceptance (docs/security-audit-checklist.md §5)
+# and a review date. Only the exact advisory is ignored; any other finding still fails the audit.
+auditConfig:
+  ignoreGhsas:
+    # RA-001 (2026-10-13, review by 2026-11-13): braces <=3.0.3 stack-exhaustion DoS from deeply
+    # nested brace patterns. Reached only through eslint-config-next -> @next/eslint-plugin-next ->
+    # fast-glob (dev-time lint, patterns from our own config). Not in the web build or any runtime
+    # image. No patched release is published (registry latest: 3.0.3).
+    - GHSA-vfj7-8cjw-p6xm

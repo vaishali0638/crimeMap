@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crimemap-api"
+version = "0.1.0"
+description = "CRIMEMAP API — internal police decision-support (DEMO / SYNTHETIC DATA)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.143,<0.144",
+  "uvicorn[standard]>=0.54,<0.55",
+  "pydantic>=2.11,<3",
+  "pydantic-settings>=2.15,<3",
+  "sqlalchemy[asyncio]>=2.0.40,<2.1",
+  "asyncpg>=0.30,<1",
+  "alembic>=1.20,<1.21",
+  "pyjwt[crypto]>=2.15,<3",
+  "httpx>=0.28,<0.29",
+  "redis>=8.1,<9",
+  "psycopg[binary]>=3.3,<4",  # migrations and admin CLI (sync)
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.1,<10",
+  "pytest-asyncio>=1.4,<2",
+  "testcontainers[postgres]>=4.15,<5",
+  "ruff",
+  "mypy",
+  "bandit>=1.9,<2",
+  "pip-audit>=2.10,<3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crimemap_api"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+markers = ["integration: needs Docker (PostgreSQL/PostGIS via testcontainers)"]
+filterwarnings = ["error::DeprecationWarning:crimemap_api.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF", "SIM", "PT"]
+# Line length is enforced by `ruff format`; long SQL literals and URLs are allowed (ruff docs).
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is for tests only: production code must not rely on it (stripped under python -O).
+"tests/**" = ["S101", "S105", "S106", "S603", "S607", "S608"]  # tests may call docker
+# Migrations assemble constant DDL from their own module-level fragments; no input reaches them.
+"migrations/versions/*.py" = ["S608"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["crimemap_api"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["testcontainers.*"]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]

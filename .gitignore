@@ -1,0 +1,51 @@
+# Secrets — never commit real values. Only .env.example (placeholders) is tracked.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Generated artefacts and local data
+/generated/
+/data/local/
+*.pmtiles
+*.dump
+*.sql.gz
+reports-output/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local security-scan staging copy
+/.scan-tmp/
+
+# Encrypted database backups and restore-test reports (scripts/backup_restore.py)
+backups/
+# Playwright signed-in sessions and reports (apps/web e2e)
+apps/web/e2e/.auth/

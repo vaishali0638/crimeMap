@@ -1,0 +1,118 @@
+# CRIMEMAP alert rules (Phase 8, ADR-038). Security signals are counts derived from the audit log by
+# the API (crimemap_api/metrics.py): they say that something needs review, never who or where.
+# Each alert names its runbook section (docs/runbook.md). Thresholds are demo values: tune them
+# against real traffic before production (runbook §2.3).
+groups:
+  - name: crimemap-availability
+    rules:
+      - alert: CrimemapApiDown
+        expr: up{job="crimemap-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: The API cannot be scraped.
+          runbook: docs/runbook.md#31-api-down-or-not-ready
+      - alert: CrimemapSignalsUnavailable
+        expr: crimemap_signals_up == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: The API cannot read the audit log, so security alerts are blind.
+          runbook: docs/runbook.md#32-database-unavailable
+      - alert: CrimemapHighErrorRate
+        expr: >
+          sum(rate(crimemap_http_requests_total{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(crimemap_http_requests_total[5m])), 1e-9) > 0.02
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: More than 2% of requests fail with a server error.
+          runbook: docs/runbook.md#33-error-rate
+      - alert: CrimemapRequestErrorsAudited
+        expr: crimemap_request_errors_15m > 5
+        labels: { severity: warning }
+        annotations:
+          summary: Unhandled request errors were recorded in the audit log.
+          runbook: docs/runbook.md#33-error-rate
+
+  - name: crimemap-performance
+    rules:
+      - alert: CrimemapMapLatencyHigh
+        expr: >
+          histogram_quantile(0.95, sum by (le) (rate(
+            crimemap_http_request_duration_seconds_bucket{route="/api/v1/map/features"}[10m]))) > 0.5
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Map filter requests p95 above the 500 ms target (ADR-017).
+          runbook: docs/runbook.md#34-slow-map-or-analytics
+      - alert: CrimemapAnalyticsLatencyHigh
+        expr: >
+          histogram_quantile(0.95, sum by (le) (rate(
+            crimemap_http_request_duration_seconds_bucket{route="/api/v1/analytics/overview"}[10m]))) > 1.5
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Analytics overview p95 above the 1.5 s target (ADR-017).
+          runbook: docs/runbook.md#34-slow-map-or-analytics
+
+  - name: crimemap-security
+    rules:
+      - alert: CrimemapMassExport
+        expr: crimemap_security_exports_max_per_actor_1h >= 5
+        labels: { severity: critical }
+        annotations:
+          summary: One user requested 5 or more exports in an hour.
+          runbook: docs/incident-response.md#mass-export
+      - alert: CrimemapRepeatedDeniedAccess
+        expr: crimemap_security_denied_max_per_source_15m >= 10
+        labels: { severity: warning }
+        annotations:
+          summary: One user or address was denied 10 or more times in 15 minutes.
+          runbook: docs/incident-response.md#repeated-denied-access
+      - alert: CrimemapDeniedAccessSpike
+        expr: crimemap_security_denied_15m >= 50
+        labels: { severity: critical }
+        annotations:
+          summary: 50 or more denied requests in 15 minutes (possible probing or misconfiguration).
+          runbook: docs/incident-response.md#repeated-denied-access
+      - alert: CrimemapUnusualGeographicAccess
+        expr: crimemap_security_new_region_actors_1h > 0
+        labels: { severity: warning }
+        annotations:
+          summary: A user opened a region they had not used in the previous 30 days.
+          runbook: docs/incident-response.md#unusual-geographic-access
+      - alert: CrimemapPrivilegeChange
+        expr: crimemap_security_privilege_changes_1h > 0
+        labels: { severity: warning }
+        annotations:
+          summary: A role was granted or revoked; confirm it matches an approved request.
+          runbook: docs/incident-response.md#privilege-change
+      - alert: CrimemapConfigChange
+        expr: crimemap_security_config_changes_1h > 0
+        labels: { severity: info }
+        annotations:
+          summary: An AI switch or feature flag changed; confirm it was planned.
+          runbook: docs/incident-response.md#privilege-change
+
+  - name: crimemap-data
+    rules:
+      - alert: CrimemapIngestionFailed
+        expr: crimemap_ingest_failures_24h > 0
+        labels: { severity: warning }
+        annotations:
+          summary: An ingestion batch was rejected or failed in the last 24 hours.
+          runbook: docs/runbook.md#35-ingestion-failure
+      - alert: CrimemapSourceStale
+        expr: crimemap_ingest_stale_sources > 0
+        for: 1h
+        labels: { severity: warning }
+        annotations:
+          summary: An approved or demo source has sent no batch for 48 hours.
+          runbook: docs/runbook.md#35-ingestion-failure
+      - alert: CrimemapAiModelFailure
+        expr: crimemap_ai_run_failures_24h > 0
+        labels: { severity: warning }
+        annotations:
+          summary: An AI detector run failed in the last 24 hours.
+          runbook: docs/runbook.md#36-ai-detector-failure

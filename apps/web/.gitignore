@@ -1,0 +1,3 @@
+
+# Copied from node_modules at build time (scripts/copy-map-assets.mjs)
+public/maplibre/

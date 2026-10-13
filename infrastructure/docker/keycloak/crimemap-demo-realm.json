@@ -1,0 +1,417 @@
+{
+  "realm": "crimemap-demo",
+  "displayName": "CRIMEMAP — DEMO / SYNTHETIC DATA",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "passwordPolicy": "length(14) and notUsername and notEmail and upperCase(1) and lowerCase(1) and digits(1) and passwordHistory(3)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 900,
+  "ssoSessionMaxLifespan": 28800,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "eventsEnabled": true,
+  "eventsExpiration": 15552000,
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "LOGOUT_ERROR",
+    "CODE_TO_TOKEN",
+    "CODE_TO_TOKEN_ERROR",
+    "REFRESH_TOKEN_ERROR",
+    "UPDATE_TOTP",
+    "REMOVE_TOTP",
+    "UPDATE_PASSWORD"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false,
+  "browserFlow": "crimemap browser",
+  "authenticatorConfig": [
+    {
+      "alias": "crimemap-pwd-reference",
+      "config": {
+        "default.reference.value": "pwd",
+        "default.reference.maxAge": "28800"
+      }
+    },
+    {
+      "alias": "crimemap-otp-reference",
+      "config": {
+        "default.reference.value": "otp",
+        "default.reference.maxAge": "28800"
+      }
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "crimemap browser",
+      "description": "Password followed by mandatory TOTP for every CRIMEMAP user",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "authenticatorFlow": true,
+          "flowAlias": "crimemap browser forms",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "crimemap browser forms",
+      "description": "Username/password then OTP; amr reference values pwd and otp",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorConfig": "crimemap-pwd-reference",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorConfig": "crimemap-otp-reference",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "authenticatorFlow": false,
+          "userSetupAllowed": true
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "crimemap-web",
+      "name": "CRIMEMAP web (BFF)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${CRIMEMAP_KC_WEB_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": [
+        "http://localhost:3100/bff/auth/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3100/signed-out",
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "true"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "acr"
+      ],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "crimemap-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "crimemap-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "authentication method reference",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "crimemap-audit-sync",
+      "name": "CRIMEMAP worker: read IdP events for the audit log",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${CRIMEMAP_KC_AUDIT_SYNC_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "basic"
+      ],
+      "optionalClientScopes": []
+    }
+  ],
+  "users": [
+    {
+      "id": "222982e5-bfc9-47f7-bb6b-cf4e7f3f187e",
+      "username": "demo.admin",
+      "enabled": true,
+      "email": "demo.admin@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "System Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "50101935-0677-4141-87dd-dab821a52345",
+      "username": "demo.steward",
+      "enabled": true,
+      "email": "demo.steward@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Data Steward",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "fa44f4b2-f0fc-4f40-b6a7-3a2bbd893403",
+      "username": "demo.analyst",
+      "enabled": true,
+      "email": "demo.analyst@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Crime Analyst",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "4ae94043-caf1-44ed-a3ef-f9f8fba4002d",
+      "username": "demo.officer",
+      "enabled": true,
+      "email": "demo.officer@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Station Officer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "d851dcb4-1dd9-4385-bfba-9bb5b27d83f4",
+      "username": "demo.sho",
+      "enabled": true,
+      "email": "demo.sho@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Station House Officer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "12c7d5af-3970-47ab-a9e9-96b239039736",
+      "username": "demo.supervisor",
+      "enabled": true,
+      "email": "demo.supervisor@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Region Supervisor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "ff3a9ae3-2cf7-4462-a59f-757ee776f358",
+      "username": "demo.leadership",
+      "enabled": true,
+      "email": "demo.leadership@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Senior Leadership",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "a194fc9f-76ef-4402-a7fd-c7f443b13b96",
+      "username": "demo.auditor",
+      "enabled": true,
+      "email": "demo.auditor@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Auditor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "id": "61801396-4ecb-4197-b90a-e8686a3406a5",
+      "username": "demo.viewer",
+      "enabled": true,
+      "email": "demo.viewer@crimemap.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "Viewer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CRIMEMAP_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "attributes": {
+        "crimemap_demo": [
+          "true"
+        ]
+      }
+    },
+    {
+      "username": "service-account-crimemap-audit-sync",
+      "enabled": true,
+      "serviceAccountClientId": "crimemap-audit-sync",
+      "clientRoles": {
+        "realm-management": [
+          "view-events"
+        ]
+      }
+    }
+  ]
+}

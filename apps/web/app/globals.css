@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "@crimemap/ui/tokens.css";
+
+@layer base {
+  html { background: var(--color-surface); color: var(--color-ink); font-family: var(--font-sans); }
+  body { min-height: 100vh; }
+  :focus-visible { outline: 2px solid var(--color-teal); outline-offset: 2px; }
+  a { color: var(--color-teal-text); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+/* MapLibre's zoom buttons are 29 px; make them meet the 44 px target size (WCAG 2.5.8 / design tokens). */
+.maplibregl-ctrl-group button {
+  width: 44px;
+  height: 44px;
+}

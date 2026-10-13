@@ -1,0 +1,126 @@
+# CRIMEMAP CI: lint, type-check, tests (with ephemeral PostGIS), OpenAPI contract, security scans,
+# SBOM. Third-party actions are pinned to full commit SHAs (version in the trailing comment);
+# scanner images are pinned by tag (digest pinning is a remaining item).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with: { python-version: "3.12" }
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" -e ../worker
+      - name: Lint (ruff)
+        run: ruff check src tests ../worker/src ../worker/tests && ruff format --check src tests
+      - name: Type-check (mypy --strict)
+        run: mypy && mypy --config-file ../worker/pyproject.toml ../worker/src
+      - name: SAST (bandit)
+        run: bandit -q -c pyproject.toml -r src ../worker/src
+      - name: Dependency audit (pip-audit, third-party packages)
+        run: |
+          pip freeze --exclude-editable > /tmp/requirements-frozen.txt
+          pip-audit -r /tmp/requirements-frozen.txt --strict --no-deps --disable-pip
+      - name: Unit tests
+        run: pytest tests/unit ../worker/tests -q
+      - name: Integration tests (testcontainers PostGIS)
+        run: pytest tests/integration -q
+      - name: OpenAPI export and drift check (the round trip runs in the integration tests)
+        run: |
+          python - <<'PY'
+          import json
+          from crimemap_api.main import create_app
+          from crimemap_api.ratelimit import InMemoryRateLimiter
+          from crimemap_api.settings import Settings
+          s = Settings(database_url="postgresql+asyncpg://u:p@localhost/x", redis_url="redis://localhost/0",
+                       oidc_issuer="http://localhost:8080/realms/crimemap-demo",
+                       oidc_jwks_url="http://localhost:8080/certs", allow_insecure_oidc=True)
+          from tests.support import local_verifier
+          app = create_app(s, verifier=local_verifier(), rate_limiter=InMemoryRateLimiter())
+          json.dump(app.openapi(), open("../../packages/types/openapi.json", "w"), indent=2, sort_keys=True)
+          PY
+          git diff --exit-code -- ../../packages/types/openapi.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with: { name: openapi, path: packages/types/openapi.json }
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: python
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version-file: .nvmrc, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with: { name: openapi, path: packages/types }
+      - name: OpenAPI lint and generated-types drift check
+        run: |
+          pnpm --package=@redocly/cli@2.57.0 dlx redocly lint packages/types/openapi.json --skip-rule=operation-4xx-response --skip-rule=info-license
+          pnpm --filter @crimemap/types check
+      - run: pnpm --filter @crimemap/web lint
+      - run: pnpm --filter @crimemap/web typecheck
+      - run: pnpm --filter @crimemap/web test
+      - name: Build
+        run: pnpm --filter @crimemap/web build
+        env:
+          CRIMEMAP_KC_WEB_CLIENT_SECRET: ci-placeholder-not-a-secret
+          CRIMEMAP_SESSION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          CRIMEMAP_REDIS_URL: redis://localhost:6379
+      - name: Dependency audit (pnpm)
+        run: pnpm audit --audit-level high --prod
+
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { fetch-depth: 0 }
+      - name: Secret scan (gitleaks)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 detect --source /repo --no-banner --redact
+      - name: SAST (semgrep)
+        run: docker run --rm -v "$PWD:/src" semgrep/semgrep:1.180.0 semgrep scan --config p/default --config p/python --config p/typescript --error --metrics off /src
+      - name: Filesystem, IaC and dependency scan (trivy)
+        run: docker run --rm -v "$PWD:/repo" aquasec/trivy:0.75.0 fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 1 /repo
+      - name: SBOM (syft, SPDX)
+        run: docker run --rm -v "$PWD:/repo" anchore/syft:v1.54.1 dir:/repo -o spdx-json > sbom.spdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with: { name: sbom, path: sbom.spdx.json }
+
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [python]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build images
+        run: |
+          docker build -t crimemap-postgres:ci infrastructure/docker/postgres
+          docker build -f infrastructure/docker/python.Dockerfile --target api -t crimemap-api:ci .
+          docker build -f infrastructure/docker/python.Dockerfile --target worker -t crimemap-worker:ci .
+      - name: Container scan (trivy)
+        run: |
+          for image in crimemap-api:ci crimemap-worker:ci crimemap-postgres:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0 image \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$image"
+          done

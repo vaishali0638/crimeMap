@@ -1,0 +1,19 @@
+{
+  "name": "@crimemap/types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript types generated from the CRIMEMAP OpenAPI document",
+  "types": "./src/api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/api.d.ts"
+    }
+  },
+  "scripts": {
+    "generate": "openapi-typescript ./openapi.json -o ./src/api.d.ts",
+    "check": "openapi-typescript ./openapi.json -o ./src/api.check.d.ts && diff -u ./src/api.d.ts ./src/api.check.d.ts; status=$?; rm -f ./src/api.check.d.ts; exit $status"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

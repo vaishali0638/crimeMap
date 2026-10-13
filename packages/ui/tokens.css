@@ -1,0 +1,23 @@
+/*
+ * CRIMEMAP design tokens (Tailwind CSS v4 @theme). Contrast ratios measured with the WCAG 2.x
+ * relative-luminance formula — see docs/information-architecture.md §9. Do not use saffron
+ * (#C9822B) for text or as the only boundary of a control.
+ */
+@theme {
+  --color-navy: #0F2340;
+  --color-ink: #1B2433;
+  --color-surface: #F7F7F5;
+  --color-surface-2: #EDEEEB;
+  --color-divider: #D5D8DC;          /* decorative separators only (1.33:1) */
+  --color-control-border: #7A828B;   /* inputs/buttons: 3.63:1 on surface */
+  --color-teal: #2D7D7A;             /* focus rings, graphics: >= 3:1 everywhere */
+  --color-teal-text: #246A67;        /* text/links: 5.87:1 on surface */
+  --color-saffron: #C9822B;          /* small fills with ink text only */
+  --color-saffron-strong: #8F5A16;   /* attention text/icons/outlines: 5.38:1 */
+  --color-on-navy: #FFFFFF;          /* 15.73:1 on navy */
+
+  --font-sans: "Noto Sans", "Noto Sans Tamil", system-ui, sans-serif;
+  --radius-control: 2px;
+  --radius-panel: 4px;
+  --spacing: 4px;                    /* Tailwind scale unit; layout uses multiples of 8px */
+}
