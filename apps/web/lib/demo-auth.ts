@@ -1,7 +1,5 @@
 import "server-only";
 import { createHmac, createHash, randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { apiFetch } from "./api";
 import { callbackUrl, client, oidcConfig } from "./oidc";
 import { ABSOLUTE_LIFETIME_MS } from "./session-policy";
@@ -56,14 +54,14 @@ function base64url(buf: Buffer): string {
 }
 
 function getTotpKey(username: string): string {
-  try {
-    const p = fileURLToPath(new URL("../../../secrets/demo-totp-keys.json", import.meta.url));
-    const all = JSON.parse(readFileSync(p, "utf8")) as Record<string, string>;
-    if (all[username]) return all[username];
-  } catch {
-    // ignore, fall back to embedded keys
-  }
-  return FALLBACK_TOTP_KEYS[username] ?? FALLBACK_TOTP_KEYS["demo.analyst"] ?? "";
+  return (
+    process.env[`CRIMEMAP_TOTP_KEY_${username
+      .replace(/^demo\./, "")
+      .toUpperCase()}`] ??
+    FALLBACK_TOTP_KEYS[username] ??
+    FALLBACK_TOTP_KEYS["demo.analyst"] ??
+    ""
+  );
 }
 
 export type DemoLoginResult = {
